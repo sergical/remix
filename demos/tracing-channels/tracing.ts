@@ -16,12 +16,12 @@ function endSpan(ctx: any) {
 // remix:request — middleware and handler tracing
 tracingChannel('remix:request', (ctx: any) => {
   let name =
-    ctx.type === 'handler' ? `${ctx.context.method} ${ctx.name}` : `middleware - ${ctx.name}`
+    ctx.type === 'handler' ? ctx.name : `middleware - ${ctx.name}`
 
   return Sentry.startSpanManual(
     {
       name,
-      op: ctx.type === 'handler' ? 'http.server' : 'middleware.remix',
+      op: ctx.type === 'handler' ? 'remix.handler' : 'middleware.remix',
       attributes: {
         'http.request.method': ctx.context?.method,
         'url.path': ctx.context?.url?.pathname,
