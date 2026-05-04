@@ -6,7 +6,10 @@
     "node": ">=24.3.0"
   },
   "dependencies": {
-    "remix": "workspace:*"
+    "remix": "workspace:*",
+    "otel-tracing-channel": "latest",
+    "@sentry/node": "latest",
+    "@sentry/opentelemetry": "latest"
   },
   "devDependencies": {
     "@types/node": "catalog:",
