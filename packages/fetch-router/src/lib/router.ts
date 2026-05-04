@@ -5,6 +5,7 @@ import { type AnyMiddleware, type ApplyMiddlewareTuple, runMiddleware } from './
 import { raceRequestAbort } from './request-abort.ts'
 import { type ContextParams, RequestContext, type WithParams } from './request-context.ts'
 import type { RequestMethod } from './request-methods.ts'
+import { shouldTrace, traceRequest } from './tracing.ts'
 import {
   type Action,
   type ActionInput,
@@ -359,6 +360,26 @@ export function createRouter<
       }
 
       context.params = { ...context.params, ...match.params }
+
+      if (shouldTrace()) {
+        let traceContext = {
+          type: 'handler' as const,
+          name: `${context.method} ${match.data.pattern.source}`,
+          context,
+        }
+
+        if (match.data.middleware && match.data.middleware.length > 0) {
+          return traceRequest(
+            () => runMiddleware(match.data.middleware!, context, match.data.handler),
+            traceContext,
+          )
+        }
+
+        return traceRequest(
+          () => raceRequestAbort(Promise.resolve(match.data.handler(context)), context.request),
+          traceContext,
+        )
+      }
 
       if (match.data.middleware && match.data.middleware.length > 0) {
         return runMiddleware(match.data.middleware, context, match.data.handler)

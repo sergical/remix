@@ -3,6 +3,7 @@ import type { ElementType, ElementProps, RemixElement } from '../runtime/jsx.ts'
 import { Fragment, createComponent, createFrameHandle, Frame } from '../runtime/component.ts'
 import { isEntry, type EntryComponent } from '../runtime/client-entries.ts'
 import { normalizeSvgAttribute } from '../runtime/svg-attributes.ts'
+import { shouldTraceRender, traceRender } from './tracing.ts'
 
 interface VNode {
   type: ElementType
@@ -225,30 +226,34 @@ export function renderToStream(
   return new ReadableStream({
     async start(controller) {
       try {
-        let root = buildSegment(node, context, rootFrameState)
-        await resolveBlocking(root)
-        await resolveClientEntries(context, options?.resolveClientEntry)
-        validateClientEntriesForHydration(context)
-        let html = serializeSegment(root)
-        let finalHtml = finalizeHtml(html, context)
-        let bytes = encoder.encode(finalHtml)
-        controller.enqueue(bytes)
+        let doRender = async () => {
+          let root = buildSegment(node, context, rootFrameState)
+          await resolveBlocking(root)
+          await resolveClientEntries(context, options?.resolveClientEntry)
+          validateClientEntriesForHydration(context)
+          let html = serializeSegment(root)
+          let finalHtml = finalizeHtml(html, context)
+          let bytes = encoder.encode(finalHtml)
+          controller.enqueue(bytes)
 
-        // If we have any tails from blocking frame streams, stream them now.
-        // These contain nested non-blocking frame templates (or other follow-up chunks)
-        // that must come after the initial document chunk.
-        let tailPromise =
-          context.blockingFrameTails.length > 0
-            ? streamByteStreams(context.blockingFrameTails, controller, context.onError)
-            : Promise.resolve()
+          let tailPromise =
+            context.blockingFrameTails.length > 0
+              ? streamByteStreams(context.blockingFrameTails, controller, context.onError)
+              : Promise.resolve()
 
-        // If we have pending non-blocking frames, stream them as they resolve
-        let pendingPromise =
-          context.pendingFrames.length > 0
-            ? streamPendingFrames(context, controller, encoder)
-            : Promise.resolve()
+          let pendingPromise =
+            context.pendingFrames.length > 0
+              ? streamPendingFrames(context, controller, encoder)
+              : Promise.resolve()
 
-        await Promise.all([tailPromise, pendingPromise])
+          await Promise.all([tailPromise, pendingPromise])
+        }
+
+        if (shouldTraceRender()) {
+          await traceRender(doRender, { frameSrc: currentFrameSrc })
+        } else {
+          await doRender()
+        }
 
         controller.close()
       } catch (error) {
