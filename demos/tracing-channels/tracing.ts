@@ -7,6 +7,12 @@ Sentry.init({
   debug: true,
 })
 
+function endSpan(ctx: any) {
+  if (ctx._spanEnded) return
+  ctx._spanEnded = true
+  ctx.span?.end()
+}
+
 // remix:request — middleware and handler tracing
 tracingChannel('remix:request', (ctx: any) => {
   let name =
@@ -27,13 +33,13 @@ tracingChannel('remix:request', (ctx: any) => {
   )
 }).subscribe({
   asyncEnd(ctx: any) {
-    ctx.span?.end()
+    endSpan(ctx)
   },
   error(ctx: any) {
     if (ctx.error) {
       ctx.span?.setStatus({ code: 2, message: ctx.error.message })
     }
-    ctx.span?.end()
+    endSpan(ctx)
   },
 })
 
@@ -51,13 +57,13 @@ tracingChannel('remix:render', (ctx: any) => {
   )
 }).subscribe({
   asyncEnd(ctx: any) {
-    ctx.span?.end()
+    endSpan(ctx)
   },
   error(ctx: any) {
     if (ctx.error) {
       ctx.span?.setStatus({ code: 2, message: ctx.error.message })
     }
-    ctx.span?.end()
+    endSpan(ctx)
   },
 })
 
@@ -76,13 +82,13 @@ tracingChannel('remix:asset', (ctx: any) => {
   )
 }).subscribe({
   asyncEnd(ctx: any) {
-    ctx.span?.end()
+    endSpan(ctx)
   },
   error(ctx: any) {
     if (ctx.error) {
       ctx.span?.setStatus({ code: 2, message: ctx.error.message })
     }
-    ctx.span?.end()
+    endSpan(ctx)
   },
 })
 

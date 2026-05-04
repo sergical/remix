@@ -14,5 +14,6 @@ export const assets = createAssetServer({
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'development'),
     },
+    external: ['@sentry/browser'],
   },
 })

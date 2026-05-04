@@ -1,16 +1,20 @@
-import * as Sentry from '@sentry/browser'
+let sentryTrace =
+  document.querySelector<HTMLMetaElement>('meta[name="sentry-trace"]')?.content ?? ''
+let baggage =
+  document.querySelector<HTMLMetaElement>('meta[name="baggage"]')?.content ?? ''
 
-Sentry.init({
-  dsn: 'https://decfaa858bad92fd007e581fe6a55a95@o447951.ingest.us.sentry.io/4511333086986240',
-  tracesSampleRate: 1.0,
-  integrations: [Sentry.browserTracingIntegration()],
-})
+console.log('Trace context from server:', { sentryTrace, baggage })
 
 let btn = document.getElementById('fetch-btn')
 let result = document.getElementById('result')
 
 btn?.addEventListener('click', async () => {
-  let res = await fetch('/ping')
+  let res = await fetch('/ping', {
+    headers: {
+      'sentry-trace': sentryTrace,
+      baggage: baggage,
+    },
+  })
   let data = await res.json()
   if (result) result.textContent = JSON.stringify(data, null, 2)
 })
