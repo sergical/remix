@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { createAccessPolicy } from './access.ts'
+import { shouldTraceAsset, traceAsset } from './tracing.ts'
 import { isAssetServerCompilationError } from './compilation-error.ts'
 import { getFingerprintRequestCacheControl, parseFingerprintSuffix } from './fingerprint.ts'
 import { getInjectedPackageRouteConfigs } from './injected-packages.ts'
@@ -274,63 +275,75 @@ export function createAssetServer(options: AssetServerOptions): AssetServer {
 
       try {
         let ifNoneMatch = request.headers.get('If-None-Match')
+        let filePath = parsedRequestPathname.filePath
+        let doCompile: () => Promise<Response | null>
 
-        if (isStyleFilePath(parsedRequestPathname.filePath)) {
-          let styleResult = await styleCompiler.getStyle(parsedRequestPathname.filePath, {
-            ifNoneMatch,
-            isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
-            requestedFingerprint: parsedRequestPathname.requestedFingerprint,
-          })
-          if (styleResult.type === 'not-modified') {
-            return new Response(null, {
-              status: 304,
-              headers: { ETag: styleResult.etag },
+        if (isStyleFilePath(filePath)) {
+          doCompile = async () => {
+            let styleResult = await styleCompiler.getStyle(filePath, {
+              ifNoneMatch,
+              isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
+              requestedFingerprint: parsedRequestPathname.requestedFingerprint,
+            })
+            if (styleResult.type === 'not-modified') {
+              return new Response(null, {
+                status: 304,
+                headers: { ETag: styleResult.etag },
+              })
+            }
+
+            let compiledStyle = styleResult.style
+
+            if (parsedRequestPathname.requestedFingerprint !== null) {
+              if (compiledStyle.fingerprint !== parsedRequestPathname.requestedFingerprint)
+                return null
+            }
+
+            return createResponseForStyle(compiledStyle, {
+              cacheControl: parsedRequestPathname.cacheControl,
+              ifNoneMatch,
+              isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
+              method: request.method,
             })
           }
+        } else if (isScriptFilePath(filePath)) {
+          doCompile = async () => {
+            let scriptResult = await scriptCompiler.getScript(filePath, {
+              ifNoneMatch,
+              isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
+              requestedFingerprint: parsedRequestPathname.requestedFingerprint,
+            })
+            if (scriptResult.type === 'not-modified') {
+              return new Response(null, {
+                status: 304,
+                headers: { ETag: scriptResult.etag },
+              })
+            }
 
-          let compiledStyle = styleResult.style
+            let compiledScript = scriptResult.script
 
-          if (parsedRequestPathname.requestedFingerprint !== null) {
-            if (compiledStyle.fingerprint !== parsedRequestPathname.requestedFingerprint)
-              return null
+            if (parsedRequestPathname.requestedFingerprint !== null) {
+              if (compiledScript.fingerprint !== parsedRequestPathname.requestedFingerprint)
+                return null
+            }
+
+            return createResponseForScript(compiledScript, {
+              cacheControl: parsedRequestPathname.cacheControl,
+              ifNoneMatch,
+              isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
+              method: request.method,
+            })
           }
-
-          return createResponseForStyle(compiledStyle, {
-            cacheControl: parsedRequestPathname.cacheControl,
-            ifNoneMatch,
-            isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
-            method: request.method,
-          })
-        }
-
-        if (!isScriptFilePath(parsedRequestPathname.filePath)) {
+        } else {
           return null
         }
 
-        let scriptResult = await scriptCompiler.getScript(parsedRequestPathname.filePath, {
-          ifNoneMatch,
-          isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
-          requestedFingerprint: parsedRequestPathname.requestedFingerprint,
-        })
-        if (scriptResult.type === 'not-modified') {
-          return new Response(null, {
-            status: 304,
-            headers: { ETag: scriptResult.etag },
-          })
+        if (shouldTraceAsset()) {
+          let assetType = isStyleFilePath(filePath) ? 'style' : 'script'
+          return await traceAsset(doCompile, { filePath, assetType })
         }
 
-        let compiledScript = scriptResult.script
-
-        if (parsedRequestPathname.requestedFingerprint !== null) {
-          if (compiledScript.fingerprint !== parsedRequestPathname.requestedFingerprint) return null
-        }
-
-        return createResponseForScript(compiledScript, {
-          cacheControl: parsedRequestPathname.cacheControl,
-          ifNoneMatch,
-          isSourceMapRequest: parsedRequestPathname.isSourceMapRequest,
-          method: request.method,
-        })
+        return await doCompile()
       } catch (error) {
         // A direct request can race with the filesystem or fail a deeper allow check while
         // compiling imports. In this fetch context, both cases should fall through as "not

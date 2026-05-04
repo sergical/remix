@@ -2,6 +2,7 @@ import type { RequestHandler } from './controller.ts'
 import { raceRequestAbort } from './request-abort.ts'
 import type { ContextEntries, RequestContext } from './request-context.ts'
 import type { RequestMethod } from './request-methods.ts'
+import { shouldTrace, traceRequest } from './tracing.ts'
 
 /**
  * A middleware of any method, params, or context transform.
@@ -134,11 +135,20 @@ export function runMiddleware<
       return nextPromise
     }
 
-    let response = await raceRequestAbort(Promise.resolve(fn(context, next)), context.request)
+    let middlewareResult: Response | undefined | void
+
+    if (shouldTrace()) {
+      middlewareResult = await traceRequest(
+        () => raceRequestAbort(Promise.resolve(fn(context, next)), context.request),
+        { type: 'middleware', name: fn.name || 'anonymous', context },
+      )
+    } else {
+      middlewareResult = await raceRequestAbort(Promise.resolve(fn(context, next)), context.request)
+    }
 
     // If a response was returned, short-circuit the chain
-    if (response instanceof Response) {
-      return response
+    if (middlewareResult instanceof Response) {
+      return middlewareResult
     }
 
     // If the middleware called next(), use the downstream response
