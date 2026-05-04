@@ -1,6 +1,7 @@
 import type { BuildAction } from 'remix/fetch-router'
 
 import type { routes } from '../routes.ts'
+import { routes as r } from '../routes.ts'
 import { render } from '../utils/render.tsx'
 
 export const home: BuildAction<'GET', typeof routes.home> = {
@@ -21,6 +22,7 @@ function HomePage() {
         <h1>Remix 3 TracingChannel Demo</h1>
         <p>Check your terminal for tracing output.</p>
         <p>Each request logs middleware, handler, render, and asset spans.</p>
+        <script type="module" src={r.assets.href({ path: 'app/assets/entry.ts' })}></script>
       </body>
     </html>
   )
