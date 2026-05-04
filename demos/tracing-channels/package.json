@@ -9,7 +9,8 @@
     "remix": "workspace:*",
     "otel-tracing-channel": "latest",
     "@sentry/node": "latest",
-    "@sentry/opentelemetry": "latest"
+    "@sentry/opentelemetry": "latest",
+    "@sentry/browser": "latest"
   },
   "devDependencies": {
     "@types/node": "catalog:",

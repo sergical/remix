@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/node'
 import { tracingChannel } from 'otel-tracing-channel'
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || 'https://wsy8BXwbREqI@teley.dev/0',
+  dsn: 'https://decfaa858bad92fd007e581fe6a55a95@o447951.ingest.us.sentry.io/4511333086986240',
   tracesSampleRate: 1.0,
   debug: true,
 })
@@ -86,4 +86,6 @@ tracingChannel('remix:asset', (ctx: any) => {
   },
 })
 
-console.log('✓ Sentry + TracingChannel subscribers active (remix:request, remix:render, remix:asset)')
+console.log(
+  '✓ Sentry + TracingChannel subscribers active (remix:request, remix:render, remix:asset)',
+)
