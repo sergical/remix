@@ -12,3 +12,7 @@ router.get(routes.assets, async ({ request }) => {
 })
 
 router.map(routes.home, home)
+
+router.get(routes.ping, () => {
+  return Response.json({ ok: true, time: Date.now() })
+})
